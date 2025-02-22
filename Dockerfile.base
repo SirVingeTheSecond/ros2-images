@@ -1,6 +1,4 @@
-ARG UBUNTU_VERSION=24.04
-
-FROM --platform=$TARGETPLATFORM ubuntu:${UBUNTU_VERSION} AS base
+FROM ubuntu:24.04 AS base
 
 SHELL ["/bin/bash", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
@@ -9,9 +7,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 ARG USERNAME=rosdev
 ARG USER_UID=1001
 ARG USER_GID=$USER_UID
-RUN groupadd --gid $USER_GID $USERNAME \
+
+# Create sudoers.d directory if it doesn't exist
+RUN mkdir -p /etc/sudoers.d \
+    && groupadd --gid $USER_GID $USERNAME \
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
-    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+    && echo "$USERNAME ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME
 
 # Install timezone data
@@ -34,7 +35,7 @@ RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o 
 RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
 
 # Install ROS 2 packages
-ARG ROS_PACKAGE=desktop
+ARG ROS_PACKAGE=ros-base
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-${ROS_DISTRO}-${ROS_PACKAGE} \
     python3-colcon-common-extensions \
@@ -44,7 +45,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Switch to non-root user for rosdep
 USER $USERNAME
-RUN rosdep init && rosdep update
+
+# Initialize rosdep
+RUN sudo rosdep init \
+    && rosdep update
 
 # Switch back to root for final setup
 USER root
