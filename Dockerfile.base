@@ -1,9 +1,18 @@
 ARG UBUNTU_VERSION=24.04
 
-FROM ubuntu:${UBUNTU_VERSION} AS base
+FROM --platform=$TARGETPLATFORM ubuntu:${UBUNTU_VERSION} AS base
 
 SHELL ["/bin/bash", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
+
+# Create non-root user
+ARG USERNAME=rosdev
+ARG USER_UID=1001
+ARG USER_GID=$USER_UID
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
+    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
 
 # Install timezone data
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -16,11 +25,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg2 \
     lsb-release \
     ca-certificates \
+    sudo \
     && rm -rf /var/lib/apt/lists/*
 
-# Set up sources.list and env variables
+# Set up sources.list
 ARG ROS_DISTRO=jazzy
-ENV ROS_DISTRO=${ROS_DISTRO}
 RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
 RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
 
@@ -33,20 +42,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-vcstool \
     && rm -rf /var/lib/apt/lists/*
 
-# Initialize rosdep
+# Switch to non-root user for rosdep
+USER $USERNAME
 RUN rosdep init && rosdep update
 
-# Set up environment
-ENV ROS_ROOT=/opt/ros/${ROS_DISTRO}
-ENV ROS_PYTHON_VERSION=3
-ENV ROS_PACKAGE_PATH=/opt/ros/${ROS_DISTRO}/share
-ENV LD_LIBRARY_PATH=/opt/ros/${ROS_DISTRO}/lib
-ENV PYTHONPATH=/opt/ros/${ROS_DISTRO}/lib/python3/dist-packages
-ENV PATH=/opt/ros/${ROS_DISTRO}/bin:$PATH
+# Switch back to root for final setup
+USER root
 
 # Setup entrypoint
-COPY ./ros_entrypoint.sh /ros_entrypoint.sh
-RUN chmod +x /ros_entrypoint.sh
+COPY --chmod=755 ./ros_entrypoint.sh /ros_entrypoint.sh
 
 ENTRYPOINT ["/ros_entrypoint.sh"]
 CMD ["bash"]

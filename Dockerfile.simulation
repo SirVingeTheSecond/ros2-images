@@ -3,14 +3,21 @@ FROM ${BASE_IMAGE}
 
 # Install simulation packages
 ARG ROS_DISTRO=jazzy
+
+# Add Gazebo Garden repository
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ros-${ROS_DISTRO}-ros-base \
-    ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
-    ros-${ROS_DISTRO}-gazebo-ros-pkgs \
-    ros-${ROS_DISTRO}-gazebo-ros \
-    ros-${ROS_DISTRO}-gazebo-plugins \
-    ros-${ROS_DISTRO}-gazebo-msgs \
+    wget \
+    && wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ros-${ROS_DISTRO}-ros-base \
+        ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
+        gz-garden \
+        ros-${ROS_DISTRO}-ros-gz \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up environment
-ENV ROS_DISTRO=${ROS_DISTRO}
+ENV ROS_DISTRO=${ROS_DISTRO} \
+    GZ_VERSION=garden \
+    IGN_GAZEBO_RESOURCE_PATH=/usr/share/gz-garden/gazebo/worlds
