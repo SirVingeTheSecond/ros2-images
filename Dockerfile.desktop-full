@@ -1,0 +1,9 @@
+ARG BASE_IMAGE=sirvingethesecond/ros2-jazzy-desktop:latest
+FROM ${BASE_IMAGE}
+
+# Install desktop-full packages
+ARG ROS_DISTRO=jazzy
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-${ROS_DISTRO}-desktop-full \
+    ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
+    && rm -rf /var/lib/apt/lists/*
